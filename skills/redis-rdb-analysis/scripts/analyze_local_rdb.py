@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
@@ -23,168 +22,8 @@ from tools.docx_renderer.render_docx import render_docx  # noqa: E402
 from tools.validation.validate_result import validate_result  # noqa: E402
 
 
-VALUE_TYPES = {
-    0: "string",
-    1: "list",
-    2: "set",
-    3: "zset",
-    4: "hash",
-    9: "zipmap",
-    10: "ziplist",
-    11: "intset",
-    12: "zset_ziplist",
-    13: "hash_ziplist",
-    14: "list_quicklist",
-    15: "stream",
-}
-
-OPCODE_EXPIRETIME_MS = 0xFC
-OPCODE_EXPIRETIME = 0xFD
-OPCODE_SELECTDB = 0xFE
-OPCODE_EOF = 0xFF
-OPCODES_WITH_LENGTH_PAIR = {0xFB}
-OPCODES_WITH_STRING = {0xFA}
-
-
-class RdbReader:
-    def __init__(self, data):
-        self.data = data
-        self.offset = 0
-
-    def remaining(self):
-        return len(self.data) - self.offset
-
-    def read_byte(self):
-        if self.offset >= len(self.data):
-            raise ValueError("unexpected end of RDB")
-        value = self.data[self.offset]
-        self.offset += 1
-        return value
-
-    def read(self, size):
-        if self.offset + size > len(self.data):
-            raise ValueError("unexpected end of RDB")
-        value = self.data[self.offset : self.offset + size]
-        self.offset += size
-        return value
-
-    def read_length(self):
-        first = self.read_byte()
-        prefix = (first & 0xC0) >> 6
-        if prefix == 0:
-            return first & 0x3F, False
-        if prefix == 1:
-            second = self.read_byte()
-            return ((first & 0x3F) << 8) | second, False
-        if prefix == 2:
-            return struct.unpack(">I", self.read(4))[0], False
-        return first & 0x3F, True
-
-    def read_string(self):
-        length, encoded = self.read_length()
-        if not encoded:
-            self.read(length)
-            return
-        if length == 0:
-            self.read(1)
-            return
-        if length == 1:
-            self.read(2)
-            return
-        if length == 2:
-            self.read(4)
-            return
-        if length == 3:
-            compressed_length, _ = self.read_length()
-            original_length, _ = self.read_length()
-            if original_length < 0:
-                raise ValueError("invalid LZF original length")
-            self.read(compressed_length)
-            return
-        raise ValueError("unsupported encoded string type %s" % length)
-
-
 def parse_rdb(path):
-    try:
-        return parse_rdb_with_hdt(path)
-    except Exception as hdt_exc:  # noqa: BLE001
-        parsed = parse_rdb_with_builtin(path)
-        parsed.setdefault("parser_warnings", []).append(
-            "HDT RDB parser unavailable or failed; used built-in fallback: %s" % hdt_exc
-        )
-        return parsed
-
-
-def parse_rdb_with_builtin(path):
-    data = path.read_bytes()
-    if len(data) < 9 or not data.startswith(b"REDIS"):
-        raise ValueError("file does not start with a Redis RDB header")
-
-    reader = RdbReader(data)
-    reader.read(9)
-    dbs = set()
-    type_distribution = Counter()
-    keys_with_ttl = 0
-    keys_without_ttl = 0
-    pending_ttl = False
-    warnings = []
-
-    while reader.remaining() > 0:
-        marker = reader.read_byte()
-        if marker == OPCODE_EOF:
-            break
-        if marker == OPCODE_SELECTDB:
-            db_index, _ = reader.read_length()
-            dbs.add(db_index)
-            continue
-        if marker == OPCODE_EXPIRETIME_MS:
-            reader.read(8)
-            pending_ttl = True
-            continue
-        if marker == OPCODE_EXPIRETIME:
-            reader.read(4)
-            pending_ttl = True
-            continue
-        if marker in OPCODES_WITH_LENGTH_PAIR:
-            reader.read_length()
-            reader.read_length()
-            continue
-        if marker in OPCODES_WITH_STRING:
-            reader.read_string()
-            reader.read_string()
-            continue
-
-        value_type = VALUE_TYPES.get(marker, "unknown_%s" % marker)
-        reader.read_string()
-        skip_value(reader, marker)
-        type_distribution[value_type] += 1
-        if pending_ttl:
-            keys_with_ttl += 1
-        else:
-            keys_without_ttl += 1
-        pending_ttl = False
-
-    total_keys = sum(type_distribution.values())
-    return {
-        "total_keys": total_keys,
-        "db_count": len(dbs) if total_keys else 0,
-        "type_distribution": dict(type_distribution),
-        "ttl": {
-            "keys_with_ttl": keys_with_ttl,
-            "keys_without_ttl": keys_without_ttl,
-        },
-        "source": "analysis.rdb_parser",
-        "parser_warnings": warnings,
-    }
-
-
-def parse_rdb_with_hdt(path):
     binary = resolve_hdt_rdb_binary()
-    if binary is None:
-        raise FileNotFoundError(
-            "HDT3213/rdb binary not found. Set DBA_ASSISTANT_HDT_RDB_BIN or install the original rdb CLI."
-        )
-
     with tempfile.TemporaryDirectory(prefix="axe-rdb-hdt-", dir="/tmp") as temp_dir:
         output_path = Path(temp_dir) / "dump.json"
         cmd = [str(binary), "-c", "json", "-o", str(output_path), str(path)]
@@ -257,23 +96,18 @@ def normalize_hdt_json_object(obj):
 
 
 def resolve_hdt_rdb_binary():
-    candidates = []
-    configured = os.getenv("DBA_ASSISTANT_HDT_RDB_BIN")
-    if configured:
-        candidates.append(Path(configured).expanduser())
+    binary = shutil.which("rdb")
+    if not binary:
+        raise FileNotFoundError(
+            "HDT3213 rdb CLI is required on PATH. Install it before running Phase-01 analysis."
+        )
 
-    candidates.append(REPO_ROOT / ".tools/bin/rdb")
-    candidates.append(Path("/Users/zqw/Desktop/Project/dba_assistant/.tools/bin/rdb"))
-
-    path_candidate = shutil.which("rdb")
-    if path_candidate:
-        candidates.append(Path(path_candidate))
-
-    for candidate in candidates:
-        resolved = candidate.expanduser().resolve()
-        if resolved.exists() and looks_like_hdt_rdb(resolved):
-            return resolved
-    return None
+    binary_path = Path(binary)
+    if not looks_like_hdt_rdb(binary_path):
+        raise RuntimeError(
+            "PATH rdb is not the required HDT3213 rdb CLI: %s" % binary_path
+        )
+    return binary_path
 
 
 def looks_like_hdt_rdb(candidate):
@@ -356,33 +190,6 @@ def iter_json_array_objects(handle):
             break
         if not chunk and buffer.strip():
             raise ValueError("Invalid HDT JSON payload: unterminated JSON array.")
-
-
-def skip_value(reader, value_type):
-    if value_type == 0:
-        reader.read_string()
-        return
-    if value_type in {1, 2}:
-        length, _ = reader.read_length()
-        for _ in range(length):
-            reader.read_string()
-        return
-    if value_type == 3:
-        length, _ = reader.read_length()
-        for _ in range(length):
-            reader.read_string()
-            reader.read_string()
-        return
-    if value_type == 4:
-        length, _ = reader.read_length()
-        for _ in range(length):
-            reader.read_string()
-            reader.read_string()
-        return
-    if value_type in {9, 10, 11, 12, 13, 14, 15}:
-        reader.read_string()
-        return
-    raise ValueError("unsupported RDB value type: %s" % value_type)
 
 
 def sha256_file(path):
@@ -571,14 +378,17 @@ def main(argv=None):
         result["summary"] = parsed_summary
         result["uncertainties"].extend(warnings)
     except Exception as exc:
-        result["status"] = "partial"
-        result["errors"].append("RDB parser could not complete full parsing: %s" % exc)
+        result["status"] = "failed"
+        result["errors"].append("RDB parser failed: %s" % exc)
         result["uncertainties"].append(
-            "Only file existence and SHA256 fingerprint are verified; key statistics are unavailable."
+            "Only file existence and SHA256 fingerprint are verified; HDT parsing did not complete."
         )
 
     result["validation"] = validate_result(result)
-    if result["status"] == "partial":
+    if result["status"] == "failed":
+        result["validation"]["mechanical"]["status"] = "fail"
+        result["validation"]["mechanical"]["details"].append("HDT RDB parser failed")
+    if result["status"] != "success":
         result["validation"]["sufficiency"]["status"] = "insufficient"
         result["validation"]["sufficiency"]["details"].append(
             "RDB parser did not provide enough data for complete statistics."
@@ -586,7 +396,7 @@ def main(argv=None):
 
     write_outputs(output_dir, result, args.user_request)
     print(str(output_dir))
-    return 0 if result["status"] in {"success", "partial"} else 1
+    return 0 if result["status"] == "success" else 1
 
 
 if __name__ == "__main__":

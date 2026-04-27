@@ -3,7 +3,7 @@
 > **Project**: axe-dba-assistant  
 > **Phase**: Phase-01  
 > **Phase Name**: 最小 MVP：本地 RDB 分析跑通与 Skill First 骨架  
-> **Status**: planning  
+> **Status**: finished  
 > **Language**: 中文  
 > **Owner**: TBD  
 > **Main SPEC**: `axe_redis_rdb_assistant_SPEC_zh_v2_1.md`  
@@ -669,6 +669,21 @@ Phase-01 每次运行产物必须写入：
 ```
 
 完整审计目录进入后续 Phase，不在 Phase-01 强制实现。
+
+### 11.1.1 HDT RDB 解析器前置条件
+
+Phase-01 要求用户在运行前手动安装 HDT3213 `rdb` CLI，并确保 `PATH` 中可以直接执行 `rdb`。
+
+本项目不得：
+
+1. 自动安装 HDT；
+2. 将 HDT 作为仓库交付物；
+3. 搜索当前仓库 `.tools/` 路径；
+4. 搜索旧 DBA Assistant 项目路径；
+5. 通过环境变量接受 HDT 绝对路径；
+6. 在 `rdb` 不可用或执行失败时 fallback 到内置解析器。
+
+如果 `rdb` 缺失或不是 HDT CLI，`analyze_local_rdb.py` 必须明确失败。
 
 ### 11.2 `result.json` 最小 schema
 

@@ -2,11 +2,89 @@
 
 ## Task Definition
 
-Use this Skill when the user asks to analyze a local Redis RDB file and produce a concise terminal answer, structured JSON result, and docx report.
+Use this Skill when the user asks to analyze a local Redis RDB file and produce:
 
-Phase-01 is local-file only. The Skill guides the LLM. Deterministic parsing, arithmetic, file checks, SHA256 calculation, validation, and output generation must be delegated to the Skill script.
+- a concise terminal answer;
+- a structured JSON result;
+- a minimal docx report.
 
-The Skill script uses the original DBA Assistant RDB analysis toolchain when available: HDT3213 `rdb` CLI first, then a built-in fallback only if HDT is unavailable or fails. This avoids relying on legacy Python `rdbtools` for high-version Redis RDB files.
+Phase-01 supports **local Redis RDB file analysis only**.
+
+The Skill guides the LLM. Deterministic parsing, arithmetic, file checks, SHA256 calculation, HDT availability checks, validation, and output generation must be delegated to the Skill script.
+
+The Skill script is:
+
+```text
+skills/redis-rdb-analysis/scripts/analyze_local_rdb.py
+```
+
+Do not hard-code user-specific absolute repository paths in this Skill.
+
+The RDB file path supplied by the user may be an absolute path, for example:
+
+```text
+/tmp/dump.rdb
+```
+
+Absolute RDB input paths are allowed and should be passed to the script unchanged.
+
+---
+
+## Core Execution Rule
+
+For Phase-01, the LLM should directly call only one execution entrypoint:
+
+```bash
+python3 skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
+  --rdb "<rdb_path>" \
+  --user-request "<original user request>"
+```
+
+Do not run extra pre-check commands before calling the script.
+
+Do not run:
+
+```bash
+pwd
+test -f skills/redis-rdb-analysis/scripts/analyze_local_rdb.py
+which rdb
+rdb -h
+```
+
+The Skill script is responsible for checking:
+
+- whether the RDB file exists;
+- whether HDT `rdb` is available in PATH;
+- whether HDT execution succeeds;
+- whether outputs can be generated;
+- whether the result is success, partial, or failed.
+
+---
+
+## Parser Requirement
+
+Phase-01 requires the HDT3213 `rdb` CLI.
+
+The runtime environment must have `rdb` available in PATH before analysis can succeed.
+
+The project does **not** install HDT.
+
+The LLM must not attempt to install HDT, download HDT, search for HDT, or run offline installation logic.
+
+The Skill script must use the `rdb` command from PATH.
+
+Do not use:
+
+- legacy Python `rdbtools`;
+- a built-in fallback parser;
+- `.tools/bin/rdb`;
+- old DBA Assistant project paths;
+- environment-variable-provided absolute parser paths;
+- full-filesystem discovery to find `rdb`.
+
+If `rdb` is missing, the script must report failure in `result.json` and `summary.txt`. The assistant should then tell the user to install HDT3213 `rdb` manually and ensure `rdb` is available in PATH.
+
+---
 
 ## Supported Inputs
 
@@ -20,60 +98,263 @@ Required input:
 
 - One local RDB file path.
 
+Examples:
+
+```text
+请分析 /tmp/dump.rdb
+请分析本地 RDB 文件 /data/redis/dump.rdb
+Please analyze /tmp/dump.rdb
+```
+
+The RDB path may be absolute or relative.
+
+If the path starts with `/`, treat it as an absolute local filesystem path and pass it unchanged.
+
 If no local RDB path is present, ask the user for the path before running analysis.
+
+---
 
 ## Intent Recognition Rules
 
-Treat the request as Redis RDB analysis when it mentions Redis RDB, dump.rdb, an `.rdb` file, Redis memory/key analysis, or asks for RDB summary/report output.
+Treat the request as Redis RDB analysis when it mentions any of the following:
 
-Extract only local filesystem paths. Do not infer remote hosts, SSH paths, object storage URLs, or MySQL staging inputs as supported Phase-01 inputs.
+- Redis RDB;
+- dump.rdb;
+- `.rdb` file;
+- Redis key analysis;
+- Redis memory analysis;
+- Redis RDB report;
+- Redis RDB summary.
+
+Extract only local filesystem paths.
+
+Do not infer or use:
+
+- remote Redis hosts;
+- SSH paths;
+- object storage URLs;
+- MySQL staging inputs;
+- Kubernetes paths;
+- container paths unless the user explicitly says the file is already available locally.
+
+Phase-01 only supports analyzing a local file that is directly accessible to the current machine.
+
+---
 
 ## Local RDB Analysis Flow
 
+Follow this flow:
+
 1. Identify the local RDB path from the user request.
-2. If the path is missing, ask for it.
-3. Call `/Users/zqw/Desktop/Project/axe-dba-assistant/skills/redis-rdb-analysis/scripts/analyze_local_rdb.py`.
-4. Read `summary.txt` and `result.json` from the output directory reported by the script.
-5. Respond using only verified facts, explicit inferences, and listed uncertainties from those files.
+2. If the path is missing, ask the user for it.
+3. Call the Skill script directly:
+
+   ```bash
+   python3 skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
+     --rdb "<rdb_path>" \
+     --user-request "<original user request>"
+   ```
+
+4. The script prints the output directory, normally:
+
+   ```text
+   /tmp/axe_rdb_assistant/<run_id>
+   ```
+
+5. Read `summary.txt` and `result.json` from that output directory using `run_command cat`, not `read_file`.
+
+6. Respond using only verified facts, explicit inferences, listed findings, listed uncertainties, and listed errors from those output files.
+
+Do not perform repository-root checks, HDT checks, or RDB existence checks in the LLM. The script owns those checks.
+
+---
 
 ## Script Usage Rules
 
-Run the Skill script through the axe runtime command capability:
+Run the Skill script through the axe runtime command capability.
+
+Use this command pattern:
 
 ```bash
-python3 /Users/zqw/Desktop/Project/axe-dba-assistant/skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
-  --rdb "/absolute/or/relative/path/to/dump.rdb" \
+python3 skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
+  --rdb "<local-rdb-path>" \
   --user-request "<original user request>"
 ```
 
-The LLM should directly call only this Skill script in Phase-01. The script may call reusable tools under `tools/validation/` and `tools/docx_renderer/`.
+Examples:
 
-Do not ask the LLM to compute Redis statistics, SHA256 fingerprints, TTL totals, type totals, or docx layout directly.
+```bash
+python3 skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
+  --rdb "/tmp/dump.rdb" \
+  --user-request "请分析/tmp/dump.rdb"
+```
 
-For high-version RDB formats, do not reinterpret parser errors as business risk. Report parser strategy and uncertainties from `result.json`.
+```bash
+python3 skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
+  --rdb "/data/redis/dump.rdb" \
+  --user-request "请分析本地 RDB 文件 /data/redis/dump.rdb"
+```
+
+The LLM should directly call only this Skill script in Phase-01.
+
+The script may internally call reusable tools under:
+
+```text
+tools/validation/
+tools/docx_renderer/
+```
+
+The LLM must not directly call those reusable tools in Phase-01.
+
+Do not ask the LLM to compute:
+
+- Redis key totals;
+- type totals;
+- TTL totals;
+- SHA256 fingerprints;
+- parser statistics;
+- docx layout;
+- validation arithmetic.
+
+These are deterministic actions and must be done by the script.
+
+---
 
 ## Output Requirements
 
-The script writes outputs under `/tmp/axe_rdb_assistant/<run_id>/` by default, or a caller-specified output directory:
+The script writes outputs under:
 
-- `summary.txt`
-- `result.json`
-- `report.docx`
-- `input/user_request.txt`
-- `input/rdb.fingerprint`
+```text
+/tmp/axe_rdb_assistant/<run_id>/
+```
+
+The required outputs are:
+
+```text
+summary.txt
+result.json
+report.docx
+input/user_request.txt
+input/rdb.fingerprint
+```
+
+Important axe tool rule:
+
+Do not use `read_file` for files under `/tmp/axe_rdb_assistant/<run_id>/`.
+
+Some axe runtimes reject absolute paths for `read_file`.
+
+Use `run_command cat` instead:
+
+```bash
+cat /tmp/axe_rdb_assistant/<run_id>/summary.txt 2>&1
+```
+
+```bash
+cat /tmp/axe_rdb_assistant/<run_id>/result.json 2>&1
+```
+
+If `cat` fails, report the failure and include the output directory.
+
+---
+
+## Required Result Fields
+
+The `result.json` file must be treated as the source of truth.
+
+It should include at least:
+
+```json
+{
+  "status": "success | partial | failed",
+  "parser_required": true,
+  "parser_strategy": "HdtRdbCli",
+  "parser_binary": "/path/to/rdb or unavailable",
+  "parser_warnings": [],
+  "input": {
+    "rdb_path": "/tmp/dump.rdb",
+    "sha256": "...",
+    "source": "input.rdb_path"
+  },
+  "summary": {
+    "total_keys": 0,
+    "db_count": 0,
+    "type_distribution": {},
+    "ttl": {
+      "keys_with_ttl": 0,
+      "keys_without_ttl": 0
+    },
+    "source": "analysis.hdt_rdb_cli"
+  },
+  "findings": [],
+  "validation": {
+    "mechanical": {
+      "status": "pass | fail",
+      "details": []
+    },
+    "logical": {
+      "status": "pass | fail | skipped",
+      "details": []
+    },
+    "sufficiency": {
+      "status": "sufficient | insufficient",
+      "details": []
+    }
+  },
+  "uncertainties": [],
+  "errors": []
+}
+```
+
+If `rdb` is missing, expected result state is:
+
+```text
+status = failed
+parser_required = true
+parser_strategy = HdtRdbCli
+parser_binary = unavailable or null
+validation.mechanical.status = fail
+validation.logical.status = skipped
+validation.sufficiency.status = insufficient
+```
+
+---
+
+## Assistant Response Requirements
 
 The assistant response should include:
 
 - analysis status;
 - output directory;
-- RDB file path and SHA256;
-- key statistics available in `summary.txt`;
+- RDB file path;
+- SHA256;
+- parser strategy;
+- parser binary;
+- key statistics from `summary.txt` or `result.json`;
 - validation status;
-- findings, uncertainties, and deferred Phase-01 items.
+- findings;
+- uncertainties;
+- errors;
+- generated files.
+
+When the analysis succeeds, say it succeeded.
+
+When the analysis fails, say it failed.
+
+When the analysis is partial, say it is partial.
+
+Do not present partial or failed analysis as full success.
+
+---
 
 ## Evidence and Source Requirements
 
-Every conclusive statement must be grounded in `result.json` or `summary.txt`.
+Every conclusive statement must be grounded in:
+
+```text
+result.json
+summary.txt
+```
 
 Use these categories:
 
@@ -82,41 +363,84 @@ Use these categories:
 - Risk: present in `findings` or clearly derived from references.
 - Uncertainty: present in `uncertainties`, `errors`, or validation details.
 
-Do not fabricate key names, key counts, DB counts, TTL counts, risk levels, or recommendations.
+Do not fabricate:
+
+- key names;
+- key counts;
+- DB counts;
+- TTL counts;
+- risk levels;
+- parser details;
+- output file paths;
+- recommendations.
+
+If the output file does not contain a fact, do not claim it as verified.
+
+---
 
 ## Validation Requirements
 
-Check the validation block in `result.json` before responding:
+Check the validation block in `result.json` before responding.
 
-- `mechanical`: file existence, parsing attempt, generated outputs, and exit status.
-- `logical`: basic consistency such as type totals and TTL totals.
-- `sufficiency`: whether the available data is enough to answer the request.
+The three validation layers are:
 
-If any layer fails or is insufficient, state that the analysis is failed or partial. Do not present partial analysis as full success.
+| Layer | Meaning |
+|---|---|
+| mechanical | file existence, parser availability, parser execution, output generation |
+| logical | arithmetic consistency such as type totals and TTL totals |
+| sufficiency | whether the available data is enough to answer the user request |
+
+If any layer fails or is insufficient, report the status clearly.
+
+If `rdb` is missing, the analysis is failed, not partial success.
+
+If HDT execution fails, the analysis is failed, and no fallback parser should be used.
+
+---
 
 ## Uncertainty Handling
 
-If parsing is partial, unsupported, or incomplete:
+If parsing is incomplete, unsupported, or failed:
 
-- Report the status as `partial` or `failed`.
-- State what was verified.
-- State what was not verified.
-- Keep recommendations conservative.
+1. Report the status as `failed` or `partial`.
+2. State what was verified.
+3. State what was not verified.
+4. Keep recommendations conservative.
+5. Do not invent Redis risks.
 
-If the script returns non-zero, read `result.json` and `summary.txt` when present, then report the failure and the output directory.
+If the script returns non-zero but output files exist, read them using `run_command cat` and summarize the failure.
+
+If the script returns non-zero and output files do not exist, report the command failure and ask the user to inspect the local environment.
+
+---
 
 ## Forbidden Behaviors
 
 Do not:
 
+- run `pwd` unless the user explicitly asks for debugging;
+- run `test -f` repository-root checks before analysis;
+- run `which rdb` or `rdb -h` before analysis;
+- install HDT;
+- download HDT;
+- search the whole filesystem for HDT;
+- use legacy Python `rdbtools`;
+- use a built-in fallback parser;
+- use `.tools/bin/rdb`;
+- use old DBA Assistant project paths;
+- use environment-variable-provided absolute parser paths;
+- hard-code user-specific repository paths;
 - run full-filesystem discovery commands such as `find /`;
 - connect to remote Redis;
 - use SSH to fetch RDB files;
 - trigger `BGSAVE`;
 - use MySQL staging;
 - aggregate multiple RDB files;
-- introduce MCP or sub-agents;
+- introduce MCP;
+- introduce sub-agents;
 - patch or wrap axe;
 - call `tools/validation/` or `tools/docx_renderer/` directly from the LLM in Phase-01;
-- fabricate statistics, keys, risks, or output files;
-- hide failures or uncertainties.
+- compute Redis statistics inside the LLM;
+- fabricate statistics, keys, risks, parser details, or output files;
+- hide failures or uncertainties;
+- use `read_file` to read `/tmp/axe_rdb_assistant/<run_id>/...` absolute paths.

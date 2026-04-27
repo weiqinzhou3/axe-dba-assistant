@@ -50,6 +50,19 @@ class Phase01StructureTests(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
+    def test_skill_documents_hdt_as_external_path_prerequisite(self):
+        skill = Path("skills/redis-rdb-analysis/SKILL.md").read_text()
+
+        self.assertIn("PATH", skill)
+        self.assertIn("HDT3213 `rdb` CLI", skill)
+        # SKILL.md correctly mentions forbidden alternatives in the
+        # Forbidden Behaviors section; verify those prohibitions exist.
+        self.assertIn("Do not", skill)
+        forbidden_section_start = skill.index("## Forbidden Behaviors")
+        forbidden_section = skill[forbidden_section_start:]
+        self.assertIn("built-in fallback", forbidden_section)
+        self.assertIn(".tools/bin/rdb", forbidden_section)
+
 
 if __name__ == "__main__":
     unittest.main()

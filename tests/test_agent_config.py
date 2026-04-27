@@ -41,15 +41,15 @@ class AgentConfigTests(unittest.TestCase):
         )
         self.assertIn("Do not run full-filesystem discovery commands such as `find /`", config)
 
-    def test_skill_uses_absolute_script_path_in_runtime_instructions(self):
+    def test_skill_uses_relative_script_path_and_forbids_hardcoded_absolute(self):
         skill = Path("skills/redis-rdb-analysis/SKILL.md").read_text(encoding="utf-8")
 
         self.assertIn(
-            PROJECT_ROOT + "/skills/redis-rdb-analysis/scripts/analyze_local_rdb.py",
+            "skills/redis-rdb-analysis/scripts/analyze_local_rdb.py",
             skill,
         )
-        self.assertNotIn(
-            "Call `skills/redis-rdb-analysis/scripts/analyze_local_rdb.py`",
+        self.assertIn(
+            "Do not hard-code user-specific absolute repository paths",
             skill,
         )
 

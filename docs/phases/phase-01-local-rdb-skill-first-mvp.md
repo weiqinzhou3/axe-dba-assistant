@@ -2,7 +2,7 @@
 
 > Project: axe-dba-assistant  
 > Phase: Phase-01  
-> Status: planning  
+> Status: finished  
 > Scope: Local Redis RDB analysis MVP  
 > Main SPEC: axe Redis RDB Assistant Main SPEC v2.1  
 > Phase SPEC Path: `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-01-local-rdb-skill-first-mvp.md`
@@ -521,6 +521,21 @@ axe version
 ```
 
 Without axe, developers may still write files and unit tests, but they cannot validate the real agent → Skill → script execution path.
+
+### 15.1 HDT RDB Parser Requirement
+
+Phase-01 requires the HDT3213 `rdb` CLI to be installed before runtime and available on `PATH` as `rdb`.
+
+The project must not:
+
+1. install HDT automatically;
+2. vendor HDT under this repository;
+3. search repository-local `.tools/` paths;
+4. search old DBA Assistant project paths;
+5. accept an absolute HDT binary path from environment variables;
+6. fallback to a built-in parser when `rdb` is unavailable or fails.
+
+If `rdb` is missing or is not the HDT CLI, `analyze_local_rdb.py` must fail explicitly.
 
 ---
 

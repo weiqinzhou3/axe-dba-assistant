@@ -56,7 +56,7 @@ GitHub：https://github.com/weiqinzhou3/dba_assistant
 
 | Phase | 阶段名称 | 当前状态 | 本地 Phase SPEC 绝对路径 | 阶段目标 |
 |---|---|---|---|---|
-| Phase-01 | Skill First 本地 RDB MVP | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-01-skill-first-local-rdb-mvp.md` | 建立 axe agent、Redis RDB Skill、RDB 本地分析脚本、最小 summary / JSON / docx 输出；验证 Skill 驱动闭环 |
+| Phase-01 | Skill First 本地 RDB MVP | `finished` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-01-skill-first-local-rdb-mvp.md` | 建立 axe agent、Redis RDB Skill、RDB 本地分析脚本、最小 summary / JSON / docx 输出；验证 Skill 驱动闭环 |
 | Phase-02 | 输出规范与三层验证强化 | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-02-output-validation-hardening.md` | 稳定 JSON schema、报告结构、机械验证、逻辑验证、充分性验证、source 约束、partial/failed/uncertainty 状态 |
 | Phase-03 | References / Assets / Profiles 完整化 | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-03-skill-assets-references-profiles.md` | 完善 Big Key 阈值、风险等级、建议库、profile、docx 模板和报告资产；让 Skill 更薄、更稳定 |
 | Phase-04 | 审计与可复现 | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-04-audit-repeatability.md` | 实现完整运行归档、stdout/stderr、axe verbose/json trace、token/latency/tool-call 记录和多次运行沉淀 |

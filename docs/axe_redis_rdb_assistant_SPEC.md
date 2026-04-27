@@ -54,7 +54,7 @@ GitHub: https://github.com/weiqinzhou3/dba_assistant
 
 | Phase | Name | Current Status | Absolute Local Phase SPEC Path | Goal |
 |---|---|---|---|---|
-| Phase-01 | Skill First Local RDB MVP | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-01-local-rdb-skill-first-mvp.md` | Build the axe agent, Redis RDB Skill, local RDB analysis script, minimal summary / JSON / docx outputs, and validate the Skill-driven loop |
+| Phase-01 | Skill First Local RDB MVP | `finished` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-01-local-rdb-skill-first-mvp.md` | Build the axe agent, Redis RDB Skill, local RDB analysis script, minimal summary / JSON / docx outputs, and validate the Skill-driven loop |
 | Phase-02 | Output Contract and Three-layer Validation Hardening | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-02-output-validation-hardening.md` | Stabilize JSON schema, report structure, mechanical validation, logical validation, sufficiency validation, source requirements, and partial/failed/uncertainty states |
 | Phase-03 | References / Assets / Profiles Completion | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-03-skill-assets-references-profiles.md` | Complete Big Key thresholds, risk levels, recommendation library, profiles, docx templates, and report assets; keep the Skill thinner and more stable |
 | Phase-04 | Audit and Repeatability | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-04-audit-repeatability.md` | Implement full run archival, stdout/stderr, axe verbose/json trace, token/latency/tool-call records, and repeated run evidence |

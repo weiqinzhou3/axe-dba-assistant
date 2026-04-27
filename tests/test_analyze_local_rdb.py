@@ -1,4 +1,6 @@
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -8,9 +10,7 @@ from zipfile import ZipFile
 
 
 SCRIPT = Path("skills/redis-rdb-analysis/scripts/analyze_local_rdb.py")
-HIGH_VERSION_RDB = Path(
-    "/Users/zqw/Desktop/Project/dba_assistant/tests/fixtures/rdb/high_version/redis_v12_hash_with_hfe.rdb"
-)
+HIGH_VERSION_RDB = Path("tests/fixtures/rdb/high_version/redis_v12_hash_with_hfe.rdb")
 
 
 class AnalyzeLocalRdbTests(unittest.TestCase):
@@ -111,7 +111,55 @@ class AnalyzeLocalRdbTests(unittest.TestCase):
             self.assertEqual(result["status"], "success")
             self.assertEqual(result["summary"]["total_keys"], 1)
             self.assertEqual(result["summary"]["type_distribution"], {"hash": 1})
+            self.assertEqual(result["summary"]["parser_binary"], shutil.which("rdb"))
             self.assertEqual(result["validation"]["logical"]["status"], "pass")
+
+    def test_analyze_local_rdb_fails_when_hdt_rdb_is_not_on_path(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            rdb = base / "empty.rdb"
+            rdb.write_bytes(b"REDIS0009\xff\x00\x00\x00\x00\x00\x00\x00\x00")
+            output_dir = base / "out"
+            env = dict(os.environ)
+            env["PATH"] = ""
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--rdb",
+                    str(rdb),
+                    "--output-dir",
+                    str(output_dir),
+                    "--user-request",
+                    "Analyze without rdb on PATH.",
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=env,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            result = json.loads((output_dir / "result.json").read_text())
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("HDT3213 rdb CLI is required on PATH", "\n".join(result["errors"]))
+
+    def test_analyze_local_rdb_source_has_no_legacy_parser_discovery_or_builtin_fallback(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        forbidden = [
+            "DBA_ASSISTANT_HDT_RDB_BIN",
+            "AXE_DBA_ASSISTANT_HDT_RDB_BIN",
+            ".tools/bin/rdb",
+            "/Users/zqw/Desktop/Project/dba_assistant/.tools/bin/rdb",
+            "parse_rdb_with_builtin",
+            "used built-in fallback",
+            "RdbReader",
+        ]
+
+        present = [text for text in forbidden if text in source]
+
+        self.assertEqual(present, [])
 
 
 if __name__ == "__main__":

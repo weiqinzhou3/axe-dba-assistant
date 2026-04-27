@@ -28,7 +28,7 @@ Unit and smoke verification cover `summary.txt`, `result.json`, and `report.docx
 
 Verification evidence:
 
-- `python3 -m unittest discover -s tests -v` ran 9 tests with OK.
+- `python3 -m pytest tests/ -v` ran 17 tests with all passing.
 - Direct script smoke test generated `/tmp/axe_rdb_assistant/manual-phase01/summary.txt`, `result.json`, and `report.docx`.
 - `axe run --agents-dir agents/redis redis-rdb-assistant --dry-run -p "..."` loaded the agent, Skill, user message, and allowed tools.
 
@@ -42,9 +42,9 @@ Real non-dry-run axe execution is blocked in this environment because provider c
 
 Parser compatibility update:
 
-- The Skill script now prefers the original DBA Assistant HDT3213 `rdb` CLI toolchain for local RDB parsing.
-- Legacy Python `rdbtools` is not used as the primary parser for high-version RDB files.
-- A high-version Redis v12/hash-field-expiration fixture from `/Users/zqw/Desktop/Project/dba_assistant/tests/fixtures/rdb/high_version/redis_v12_hash_with_hfe.rdb` is covered by regression testing.
+- Phase-01 now treats HDT3213 `rdb` CLI as a runtime prerequisite.
+- The Skill script uses only `rdb` from `PATH`; it does not install HDT, search `.tools/`, search the old DBA Assistant repository, accept an absolute parser path from environment variables, or fallback to a built-in parser.
+- A high-version Redis v12/hash-field-expiration fixture under `tests/fixtures/rdb/high_version/redis_v12_hash_with_hfe.rdb` is covered by regression testing.
 
 8. What must be fixed in Phase-02?
 
