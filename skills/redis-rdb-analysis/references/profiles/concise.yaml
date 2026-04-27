@@ -1,0 +1,6 @@
+name: concise
+language: auto
+detail_level: concise
+include_docx: true
+include_json: true
+include_summary: true

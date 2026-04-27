@@ -1,0 +1,6 @@
+name: default
+language: auto
+detail_level: standard
+include_docx: true
+include_json: true
+include_summary: true

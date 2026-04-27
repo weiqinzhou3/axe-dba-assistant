@@ -1,0 +1,8 @@
+name: rcs
+language: zh
+detail_level: standard
+include_docx: true
+include_json: true
+include_summary: true
+notes:
+  - Use conservative wording for operational risk.

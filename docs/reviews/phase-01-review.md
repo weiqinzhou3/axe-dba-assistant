@@ -1,0 +1,51 @@
+# Phase-01 Review
+
+## Review Questions
+
+1. Did the Skill guide the execution path?
+
+Yes. The agent configuration points to `skills/redis-rdb-analysis/SKILL.md`, and the Skill instructs the LLM to call only `skills/redis-rdb-analysis/scripts/analyze_local_rdb.py` for Phase-01 execution.
+
+2. Did the project avoid `src/` and root-level `scripts/`?
+
+Yes. Redis-specific execution is under the Skill package, and reusable deterministic capabilities are under `tools/`.
+
+3. Did the Skill script remain the only direct execution entrypoint?
+
+Yes. The only Phase-01 Redis RDB execution entrypoint is `skills/redis-rdb-analysis/scripts/analyze_local_rdb.py`.
+
+4. Did reusable docx and validation capabilities stay under `tools/`?
+
+Yes. Generic docx rendering is under `tools/docx_renderer/`, and generic result validation is under `tools/validation/`.
+
+5. Did Redis RDB-specific logic stay under the Redis RDB Skill?
+
+Yes. RDB parsing and Redis-specific references live under `skills/redis-rdb-analysis/`.
+
+6. Were the three required outputs generated?
+
+Unit and smoke verification cover `summary.txt`, `result.json`, and `report.docx`.
+
+Verification evidence:
+
+- `python3 -m unittest discover -s tests -v` ran 9 tests with OK.
+- Direct script smoke test generated `/tmp/axe_rdb_assistant/manual-phase01/summary.txt`, `result.json`, and `report.docx`.
+- `axe run --agents-dir agents/redis redis-rdb-assistant --dry-run -p "..."` loaded the agent, Skill, user message, and allowed tools.
+
+7. Were failure and partial states handled correctly?
+
+Missing local file handling writes a failed `result.json` and exits non-zero. Parser exceptions produce partial status with explicit uncertainty.
+
+Runtime caveat:
+
+Real non-dry-run axe execution is blocked in this environment because provider credentials are not configured. The exact error is: `API key for provider "openai" is not configured (set OPENAI_API_KEY or add to config.toml)`.
+
+Parser compatibility update:
+
+- The Skill script now prefers the original DBA Assistant HDT3213 `rdb` CLI toolchain for local RDB parsing.
+- Legacy Python `rdbtools` is not used as the primary parser for high-version RDB files.
+- A high-version Redis v12/hash-field-expiration fixture from `/Users/zqw/Desktop/Project/dba_assistant/tests/fixtures/rdb/high_version/redis_v12_hash_with_hfe.rdb` is covered by regression testing.
+
+8. What must be fixed in Phase-02?
+
+Phase-02 should harden the JSON schema, validation strictness, source traceability, and partial/failed semantics.

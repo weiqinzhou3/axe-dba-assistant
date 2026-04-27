@@ -1,0 +1,8 @@
+version: 1
+recommendations:
+  local_rdb_only:
+    title: Local RDB analysis scope
+    text: Phase-01 only verifies local RDB artifacts. Confirm live Redis state separately before production actions.
+  partial_parse:
+    title: Partial parser result
+    text: Treat missing key statistics as uncertainty and avoid definitive capacity conclusions.
