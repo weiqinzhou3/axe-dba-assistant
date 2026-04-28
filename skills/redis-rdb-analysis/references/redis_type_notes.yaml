@@ -1,0 +1,23 @@
+version: 1
+types:
+  string:
+    label: String
+    note: Scalar value or encoded binary payload. Evaluate byte size when available.
+  hash:
+    label: Hash
+    note: Field-value map. Evaluate field count and object concentration when available.
+  list:
+    label: List
+    note: Ordered sequence. Evaluate element count and trimming policy when available.
+  set:
+    label: Set
+    note: Unique member collection. Evaluate member count and membership workload when available.
+  zset:
+    label: Sorted set
+    note: Score-indexed member collection. Evaluate member count and ranking workload when available.
+  stream:
+    label: Stream
+    note: Append-only event log. Evaluate entry count, retention policy, and consumer lag when available.
+  module:
+    label: Module type
+    note: Module-owned value. Interpret with module-specific tooling when available.

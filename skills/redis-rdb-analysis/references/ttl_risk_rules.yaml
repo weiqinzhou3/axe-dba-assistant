@@ -1,0 +1,18 @@
+version: 1
+rules:
+  many_keys_without_ttl:
+    severity: medium
+    condition: keys_without_ttl is high relative to total_keys
+    wording: Many keys have no TTL. Confirm whether persistent retention is intentional.
+  synchronized_expiration:
+    severity: medium
+    condition: many keys expire in the same time window
+    wording: Concentrated expirations can create latency spikes. Validate expiration distribution when TTL detail is available.
+  ttl_analysis_unavailable:
+    severity: info
+    condition: TTL summary is missing or parser did not complete
+    wording: TTL risk cannot be concluded from this run.
+  persistent_cache_like_keys:
+    severity: medium
+    condition: cache-like keys are persistent
+    wording: Persistent cache-like keys can grow without lifecycle controls. Confirm business retention requirements.

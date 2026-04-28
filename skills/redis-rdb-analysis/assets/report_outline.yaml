@@ -1,0 +1,30 @@
+version: 1
+title: Redis RDB Analysis Report
+sections:
+  - id: analysis_target
+    heading: Analysis Target
+    source: input
+  - id: parser_metadata
+    heading: Parser Metadata
+    source: parser
+  - id: basic_statistics
+    heading: Basic Statistics
+    source: summary
+  - id: ttl_overview
+    heading: TTL Overview
+    source: summary.ttl
+  - id: type_distribution
+    heading: Type Distribution
+    source: summary.type_distribution
+  - id: findings
+    heading: Findings
+    source: findings
+  - id: validation_results
+    heading: Validation Results
+    source: validation
+  - id: uncertainties_and_limitations
+    heading: Uncertainties and Limitations
+    source: uncertainties
+  - id: generated_outputs
+    heading: Generated Outputs
+    source: outputs

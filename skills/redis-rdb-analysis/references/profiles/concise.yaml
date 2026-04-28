@@ -1,6 +1,9 @@
 name: concise
-language: auto
+language: zh
 detail_level: concise
 include_docx: true
 include_json: true
 include_summary: true
+report_style: terminal
+max_findings: 10
+description: Short terminal-oriented analysis with only verified essentials.

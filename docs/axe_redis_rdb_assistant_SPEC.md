@@ -56,8 +56,8 @@ GitHub: https://github.com/weiqinzhou3/dba_assistant
 |---|---|---|---|---|
 | Phase-01 | Skill First Local RDB MVP | `finished` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-01-local-rdb-skill-first-mvp.md` | Build the axe agent, Redis RDB Skill, local RDB analysis script, minimal summary / JSON / docx outputs, and validate the Skill-driven loop |
 | Phase-02 | Output Contract and Three-layer Validation Hardening | `finished` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-02-output-validation-hardening.md` | Stabilize JSON schema, report structure, mechanical validation, logical validation, sufficiency validation, source requirements, and partial/failed/uncertainty states |
-| Phase-03 | References / Assets / Profiles Completion | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-03-skill-assets-references-profiles.md` | Complete Big Key thresholds, risk levels, recommendation library, profiles, docx templates, and report assets; keep the Skill thinner and more stable |
-| Phase-04 | Audit and Repeatability | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-04-audit-repeatability.md` | Implement full run archival, stdout/stderr, axe verbose/json trace, token/latency/tool-call records, and repeated run evidence |
+| Phase-03 | References / Assets / Profiles Completion | `finished` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-03-references-assets-profiles.md` | Complete Big Key thresholds, risk levels, recommendation library, profiles, docx templates, and report assets; keep the Skill thinner and more stable |
+| Phase-04 | Audit and Reproducibility | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-04-audit-reproducibility.md` | Implement full run archival, stdout/stderr, axe verbose/json trace, token/latency/tool-call records, and repeated run evidence |
 | Phase-05 | Skill Experience and Route Comparison Preparation | `planning` | `/Users/zqw/Desktop/Project/axe-dba-assistant/docs/phases/phase-05-skill-experience-comparison-prep.md` | Produce Skill design lessons, anti-patterns, and axe-side evidence for a later manual comparison with DeepAgents SDK |
 
 ### 3.3 Phase Boundary Rules
@@ -350,10 +350,10 @@ By the end of stage one, the project must have:
 
 ```text
 Main SPEC
-  ├── docs/phases/phase-01-skill-first-local-rdb-mvp.md
+  ├── docs/phases/phase-01-local-rdb-skill-first-mvp.md
   ├── docs/phases/phase-02-output-validation-hardening.md
-  ├── docs/phases/phase-03-skill-assets-references-profiles.md
-  ├── docs/phases/phase-04-audit-repeatability.md
+  ├── docs/phases/phase-03-references-assets-profiles.md
+  ├── docs/phases/phase-04-audit-reproducibility.md
   ├── docs/phases/phase-05-skill-experience-comparison-prep.md
   ├── docs/reviews/
   ├── docs/decisions/

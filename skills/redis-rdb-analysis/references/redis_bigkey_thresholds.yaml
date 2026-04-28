@@ -1,11 +1,55 @@
-# Phase-01 placeholder thresholds.
-# Detailed threshold hardening belongs to Phase-03.
 version: 1
 scope: local_rdb
+description: Editable Redis big-key threshold candidates for report wording. These are reference rules, not parser logic.
 thresholds:
-  string_bytes:
+  string:
+    metric: bytes
     warning: 1048576
     critical: 10485760
+    severity:
+      warning: medium
+      critical: high
+    rationale: Large string values can increase network latency, persistence cost, and single-key memory pressure.
+  hash:
+    metric: fields
+    warning: 10000
+    critical: 100000
+    severity:
+      warning: medium
+      critical: high
+    rationale: Large hashes can concentrate access and memory pressure on one logical object.
+  list:
+    metric: elements
+    warning: 10000
+    critical: 100000
+    severity:
+      warning: medium
+      critical: high
+    rationale: Large lists can make range operations, trimming, migration, and persistence heavier.
+  set:
+    metric: members
+    warning: 10000
+    critical: 100000
+    severity:
+      warning: medium
+      critical: high
+    rationale: Large sets can make membership-heavy workloads and persistence snapshots more expensive.
+  zset:
+    metric: members
+    warning: 10000
+    critical: 100000
+    severity:
+      warning: medium
+      critical: high
+    rationale: Large sorted sets combine member volume with score-index maintenance cost.
+  stream:
+    metric: entries
+    warning: 10000
+    critical: 100000
+    severity:
+      warning: medium
+      critical: high
+    rationale: Large streams may indicate retention pressure and should be evaluated with trimming policy.
   collection_members:
     warning: 10000
     critical: 100000

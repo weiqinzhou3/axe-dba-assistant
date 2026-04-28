@@ -1,6 +1,9 @@
 name: default
-language: auto
-detail_level: standard
+language: zh
+detail_level: normal
 include_docx: true
 include_json: true
 include_summary: true
+report_style: minimal
+max_findings: 20
+description: Default Chinese report behavior for local Redis RDB analysis.

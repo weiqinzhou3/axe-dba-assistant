@@ -1,8 +1,28 @@
 version: 1
+usage: Recommendation candidates only. Emit them only when result findings and validation support the conclusion.
 recommendations:
   local_rdb_only:
     title: Local RDB analysis scope
-    text: Phase-01 only verifies local RDB artifacts. Confirm live Redis state separately before production actions.
+    applies_when:
+      - Any local RDB report is used for production decision-making.
+    severity: info
+    text: Local RDB analysis verifies persisted artifacts only. Confirm live Redis state separately before production actions.
   partial_parse:
     title: Partial parser result
+    applies_when:
+      - status is partial or failed
+      - validation.sufficiency.status is insufficient
+    severity: medium
     text: Treat missing key statistics as uncertainty and avoid definitive capacity conclusions.
+  ttl_review:
+    title: TTL policy review
+    applies_when:
+      - summary.ttl.keys_without_ttl is high relative to total_keys
+    severity: medium
+    text: Review whether persistent keys match product requirements and cache retention policy.
+  bigkey_review:
+    title: Big key follow-up
+    applies_when:
+      - Big-key metrics are available and exceed thresholds.
+    severity: high
+    text: Review large keys for sharding, compaction, data model changes, or lifecycle controls.

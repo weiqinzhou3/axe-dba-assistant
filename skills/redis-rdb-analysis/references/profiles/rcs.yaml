@@ -1,8 +1,11 @@
 name: rcs
 language: zh
-detail_level: standard
+detail_level: rich
 include_docx: true
 include_json: true
 include_summary: true
+report_style: client_facing
+max_findings: 30
 notes:
   - Use conservative wording for operational risk.
+  - Include more context when findings are supported by result data.

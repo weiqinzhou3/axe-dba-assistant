@@ -2,7 +2,7 @@
 
 > Project: axe-dba-assistant  
 > Phase: Phase-03  
-> Status: planning  
+> Status: finished  
 > Scope: Redis RDB references, profiles, report assets, and Skill thinning  
 > Main SPEC: axe Redis RDB Assistant Main SPEC v2.1  
 > Depends On: Phase-02 Output Contract and Validation Hardening  
@@ -245,14 +245,14 @@ Add tests for:
 
 Phase-03 is accepted only if:
 
-- [ ] required references exist;
-- [ ] required profiles exist;
-- [ ] required assets exist;
-- [ ] profile structure is documented;
-- [ ] report outline is externalized;
-- [ ] Skill is thinner and does not embed long threshold tables;
-- [ ] tests validate references, profiles, and assets;
-- [ ] no execution scope expansion occurs.
+- [x] required references exist;
+- [x] required profiles exist;
+- [x] required assets exist;
+- [x] profile structure is documented;
+- [x] report outline is externalized;
+- [x] Skill is thinner and does not embed long threshold tables;
+- [x] tests validate references, profiles, and assets;
+- [x] no execution scope expansion occurs.
 
 ---
 

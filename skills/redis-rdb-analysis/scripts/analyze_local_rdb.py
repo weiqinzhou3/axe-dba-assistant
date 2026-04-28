@@ -13,13 +13,80 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+REFERENCES_DIR = SKILL_ROOT / "references"
+ASSETS_DIR = SKILL_ROOT / "assets"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tools.docx_renderer.render_docx import render_docx  # noqa: E402
 from tools.validation.validate_result import validate_result  # noqa: E402
+
+
+def resource_path_label(path):
+    return str(path.relative_to(SKILL_ROOT))
+
+
+def load_yaml_resource(path):
+    with path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    if not isinstance(data, dict):
+        raise RuntimeError("resource is not a YAML object: %s" % resource_path_label(path))
+    return data
+
+
+def load_profile(profile_name):
+    profile_path = REFERENCES_DIR / "profiles" / ("%s.yaml" % profile_name)
+    if not profile_path.exists():
+        raise FileNotFoundError("profile not found: %s" % profile_name)
+    profile = load_yaml_resource(profile_path)
+    profile["name"] = profile.get("name") or profile_name
+    profile["source"] = resource_path_label(profile_path)
+    return profile
+
+
+def load_report_outline():
+    outline_path = ASSETS_DIR / "report_outline.yaml"
+    if not outline_path.exists():
+        raise FileNotFoundError("report outline not found: %s" % resource_path_label(outline_path))
+    outline = load_yaml_resource(outline_path)
+    sections = outline.get("sections")
+    if not isinstance(sections, list) or not sections:
+        raise RuntimeError("report outline has no sections: %s" % resource_path_label(outline_path))
+    return outline
+
+
+def collect_resource_metadata(report_outline, warnings):
+    required_references = [
+        REFERENCES_DIR / "redis_bigkey_thresholds.yaml",
+        REFERENCES_DIR / "redis_risk_levels.yaml",
+        REFERENCES_DIR / "redis_recommendations.yaml",
+        REFERENCES_DIR / "redis_type_notes.yaml",
+        REFERENCES_DIR / "ttl_risk_rules.yaml",
+    ]
+    missing_required = [resource_path_label(path) for path in required_references if not path.exists()]
+    if missing_required:
+        raise FileNotFoundError("required reference files are missing: %s" % ", ".join(missing_required))
+
+    optional_assets = [
+        ASSETS_DIR / "examples" / "summary_example.txt",
+        ASSETS_DIR / "examples" / "result_example.json",
+    ]
+    for path in optional_assets:
+        if not path.exists():
+            warnings.append("optional resource missing: %s" % resource_path_label(path))
+
+    return {
+        "report_outline": "assets/report_outline.yaml",
+        "report_outline_version": report_outline.get("version"),
+        "references": [resource_path_label(path) for path in required_references],
+        "references_status": "available_with_warnings" if warnings else "available",
+        "warnings": warnings,
+    }
 
 
 def parse_rdb(path):
@@ -233,6 +300,15 @@ def base_result(rdb_path, sha256_value, status):
         "uncertainties": [],
         "errors": [],
         "outputs": {},
+        "profile": {
+            "name": "unavailable",
+            "source": "unavailable",
+        },
+        "resources": {
+            "report_outline": "unavailable",
+            "references_status": "unavailable",
+            "warnings": [],
+        },
     }
 
 
@@ -293,21 +369,34 @@ def build_summary_text(result):
     )
 
 
-def build_docx_sections(result):
+def section_heading(outline_by_id, section_id, fallback):
+    section = outline_by_id.get(section_id, {})
+    return section.get("heading") or fallback
+
+
+def build_docx_sections(result, report_outline=None):
     summary = result["summary"]
     validation = result["validation"]
+    outline_by_id = {}
+    if report_outline:
+        outline_by_id = {
+            section.get("id"): section
+            for section in report_outline.get("sections", [])
+            if isinstance(section, dict) and section.get("id")
+        }
     return [
         {
-            "heading": "Analysis Target",
+            "heading": section_heading(outline_by_id, "analysis_target", "Analysis Target"),
             "lines": [
                 "Analysis time: %s" % result.get("generated_at", ""),
                 "RDB file path: %s" % result["input"]["rdb_path"],
                 "SHA256 fingerprint: %s" % (result["input"]["sha256"] or "unavailable"),
                 "Analysis status: %s" % result["status"],
+                "Profile: %s" % result.get("profile", {}).get("name", "unavailable"),
             ],
         },
         {
-            "heading": "Parser Metadata",
+            "heading": section_heading(outline_by_id, "parser_metadata", "Parser Metadata"),
             "lines": [
                 "Parser required: %s" % json.dumps(result.get("parser_required", False)),
                 "Parser strategy: %s" % result.get("parser_strategy", "unavailable"),
@@ -321,17 +410,34 @@ def build_docx_sections(result):
             ],
         },
         {
-            "heading": "Basic Statistics",
+            "heading": section_heading(outline_by_id, "basic_statistics", "Basic Statistics"),
             "lines": [
                 "DB count: %s" % summary["db_count"],
                 "Total keys: %s" % summary["total_keys"],
-                "Type distribution: %s" % json.dumps(summary["type_distribution"], sort_keys=True),
+            ],
+        },
+        {
+            "heading": section_heading(outline_by_id, "ttl_overview", "TTL Overview"),
+            "lines": [
                 "TTL: keys_with_ttl=%s, keys_without_ttl=%s"
                 % (summary["ttl"]["keys_with_ttl"], summary["ttl"]["keys_without_ttl"]),
             ],
         },
         {
-            "heading": "Validation Results",
+            "heading": section_heading(outline_by_id, "type_distribution", "Type Distribution"),
+            "lines": [
+                "Type distribution: %s" % json.dumps(summary["type_distribution"], sort_keys=True),
+            ],
+        },
+        {
+            "heading": section_heading(outline_by_id, "findings", "Findings"),
+            "lines": [
+                "Findings: %s"
+                % (json.dumps(result.get("findings"), ensure_ascii=False) if result.get("findings") else "none"),
+            ],
+        },
+        {
+            "heading": section_heading(outline_by_id, "validation_results", "Validation Results"),
             "lines": [
                 "Mechanical validation: %s" % validation["mechanical"]["status"],
                 "Logical validation: %s" % validation["logical"]["status"],
@@ -339,10 +445,12 @@ def build_docx_sections(result):
             ],
         },
         {
-            "heading": "Risks, Uncertainties, and Phase-01 / Phase-02 limitations",
+            "heading": section_heading(
+                outline_by_id,
+                "uncertainties_and_limitations",
+                "Uncertainties and Limitations",
+            ),
             "lines": [
-                "Findings: %s"
-                % (json.dumps(result.get("findings"), ensure_ascii=False) if result.get("findings") else "none"),
                 "Uncertainties: %s"
                 % (
                     json.dumps(result.get("uncertainties"), ensure_ascii=False)
@@ -350,6 +458,18 @@ def build_docx_sections(result):
                     else "none"
                 ),
                 "Phase-01 / Phase-02 limitations: local RDB only; no remote Redis, SSH, MySQL staging, multi-RDB aggregation, full audit trace, advanced risk knowledge base, or final delivery-grade docx styling.",
+            ],
+        },
+        {
+            "heading": section_heading(outline_by_id, "generated_outputs", "Generated Outputs"),
+            "lines": [
+                "Output directory: %s" % result.get("outputs", {}).get("output_dir", "unavailable"),
+                "summary.txt: %s"
+                % result.get("outputs", {}).get("summary_txt", {}).get("path", "unavailable"),
+                "result.json: %s"
+                % result.get("outputs", {}).get("result_json", {}).get("path", "unavailable"),
+                "report.docx: %s"
+                % result.get("outputs", {}).get("report_docx", {}).get("path", "unavailable"),
             ],
         },
     ]
@@ -386,7 +506,14 @@ def apply_validation(result, mechanical_details=None, sufficiency_details=None):
     result["validation"] = validation
 
 
-def write_outputs(output_dir, result, user_request, mechanical_details=None, sufficiency_details=None):
+def write_outputs(
+    output_dir,
+    result,
+    user_request,
+    mechanical_details=None,
+    sufficiency_details=None,
+    report_outline=None,
+):
     output_dir.mkdir(parents=True, exist_ok=True)
     input_dir = output_dir / "input"
     input_dir.mkdir(parents=True, exist_ok=True)
@@ -401,7 +528,7 @@ def write_outputs(output_dir, result, user_request, mechanical_details=None, suf
     render_docx(
         output_dir / "report.docx",
         "Redis RDB Analysis Report",
-        build_docx_sections(result),
+        build_docx_sections(result, report_outline),
     )
     result["outputs"] = build_outputs_metadata(output_dir)
     apply_validation(result, mechanical_details, sufficiency_details)
@@ -415,7 +542,7 @@ def write_outputs(output_dir, result, user_request, mechanical_details=None, suf
     render_docx(
         output_dir / "report.docx",
         "Redis RDB Analysis Report",
-        build_docx_sections(result),
+        build_docx_sections(result, report_outline),
     )
     result["outputs"] = build_outputs_metadata(output_dir)
     apply_validation(result, mechanical_details, sufficiency_details)
@@ -439,6 +566,11 @@ def parse_args(argv):
         help="Output directory. Defaults to /tmp/axe_rdb_assistant/<run_id>/.",
     )
     parser.add_argument("--user-request", default="", help="Original user request text.")
+    parser.add_argument(
+        "--profile",
+        default="default",
+        help="Analysis response profile name under references/profiles/. Defaults to default.",
+    )
     return parser.parse_args(argv)
 
 
@@ -456,13 +588,36 @@ def main(argv=None):
 
     sha256_value = sha256_file(rdb_path)
     result = base_result(rdb_path, sha256_value, "success")
+    report_outline = None
+
+    try:
+        resource_warnings = []
+        profile = load_profile(args.profile)
+        report_outline = load_report_outline()
+        result["profile"] = profile
+        result["resources"] = collect_resource_metadata(report_outline, resource_warnings)
+        result["parser_warnings"].extend(resource_warnings)
+        result["uncertainties"].extend(resource_warnings)
+    except Exception as exc:
+        result["status"] = "failed"
+        result["errors"].append("Phase-03 resource loading failed: %s" % exc)
+        write_outputs(
+            output_dir,
+            result,
+            args.user_request,
+            mechanical_details=["Phase-03 resource loading failed"],
+            sufficiency_details=["RDB analysis resources were unavailable."],
+            report_outline=report_outline,
+        )
+        print(str(output_dir))
+        return 1
 
     try:
         parsed_summary = parse_rdb(rdb_path)
         warnings = parsed_summary.pop("parser_warnings", [])
         result["parser_strategy"] = parsed_summary.get("parser_strategy", "HdtRdbCli")
         result["parser_binary"] = parsed_summary.get("parser_binary", "unavailable")
-        result["parser_warnings"] = warnings
+        result["parser_warnings"].extend(warnings)
         result["summary"] = parsed_summary
         result["uncertainties"].extend(warnings)
     except Exception as exc:
@@ -481,7 +636,14 @@ def main(argv=None):
             "RDB parser did not provide enough data for complete statistics."
         )
 
-    write_outputs(output_dir, result, args.user_request, mechanical_details, sufficiency_details)
+    write_outputs(
+        output_dir,
+        result,
+        args.user_request,
+        mechanical_details,
+        sufficiency_details,
+        report_outline=report_outline,
+    )
     print(str(output_dir))
     return 0 if result["status"] == "success" else 1
 

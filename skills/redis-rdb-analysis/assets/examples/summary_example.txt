@@ -1,0 +1,16 @@
+1. Analysis Target
+- RDB file: /tmp/dump.rdb
+- SHA256: example
+- Analysis status: success
+
+2. Parser Metadata
+- Parser required: true
+- Parser strategy: HdtRdbCli
+- Parser binary: /usr/local/bin/rdb
+- Parser warnings: none
+
+3. Basic Statistics
+- DB count: 1
+- Total keys: 1
+
+This example is illustrative only. Use generated output files as the source of truth.

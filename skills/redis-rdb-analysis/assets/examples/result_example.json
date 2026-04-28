@@ -1,0 +1,16 @@
+{
+  "schema_version": "phase-02.v1",
+  "status": "success",
+  "parser_required": true,
+  "parser_strategy": "HdtRdbCli",
+  "parser_binary": "/usr/local/bin/rdb",
+  "parser_warnings": [],
+  "profile": {
+    "name": "default",
+    "source": "references/profiles/default.yaml"
+  },
+  "resources": {
+    "report_outline": "assets/report_outline.yaml",
+    "references_status": "available"
+  }
+}

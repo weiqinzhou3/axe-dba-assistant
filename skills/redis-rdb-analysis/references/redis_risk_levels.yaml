@@ -1,8 +1,12 @@
 version: 1
-risk_levels:
+levels:
   info:
-    description: Informational observation.
-  warning:
-    description: Needs review but is not immediately critical.
+    meaning: Informational finding.
+  low:
+    meaning: Low operational risk.
+  medium:
+    meaning: Requires attention.
+  high:
+    meaning: Likely operational impact.
   critical:
-    description: Requires operational attention.
+    meaning: Immediate action recommended.
