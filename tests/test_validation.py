@@ -6,7 +6,13 @@ from tools.validation.validate_result import validate_result
 class ValidateResultTests(unittest.TestCase):
     def minimal_result(self):
         return {
+            "schema_version": "phase-02.v1",
             "status": "success",
+            "generated_at": "2026-04-28T00:00:00+00:00",
+            "parser_required": True,
+            "parser_strategy": "HdtRdbCli",
+            "parser_binary": "/usr/local/bin/rdb",
+            "parser_warnings": [],
             "input": {
                 "rdb_path": "/tmp/dump.rdb",
                 "sha256": "a" * 64,
@@ -30,6 +36,12 @@ class ValidateResultTests(unittest.TestCase):
             },
             "uncertainties": [],
             "errors": [],
+            "outputs": {
+                "output_dir": "/tmp/out",
+                "summary_txt": {"path": "/tmp/out/summary.txt", "exists": True},
+                "result_json": {"path": "/tmp/out/result.json", "exists": True},
+                "report_docx": {"path": "/tmp/out/report.docx", "exists": True},
+            },
         }
 
     def test_validate_result_accepts_minimal_success_contract(self):

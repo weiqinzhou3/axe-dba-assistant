@@ -8,9 +8,9 @@ Use this Skill when the user asks to analyze a local Redis RDB file and produce:
 - a structured JSON result;
 - a minimal docx report.
 
-Phase-01 supports **local Redis RDB file analysis only**.
+Phase-01 and Phase-02 support **local Redis RDB file analysis only**.
 
-The Skill guides the LLM. Deterministic parsing, arithmetic, file checks, SHA256 calculation, HDT availability checks, validation, and output generation must be delegated to the Skill script.
+The Skill guides the LLM. Deterministic parsing, arithmetic, file checks, SHA256 calculation, HDT availability checks, validation, and output generation must be delegated to the Skill script. In Phase-02, `result.json` is the source of truth for every status, statistic, file path, and validation conclusion.
 
 The Skill script is:
 
@@ -32,7 +32,7 @@ Absolute RDB input paths are allowed and should be passed to the script unchange
 
 ## Core Execution Rule
 
-For Phase-01, the LLM should directly call only one execution entrypoint:
+For Phase-01 and Phase-02, the LLM should directly call only one execution entrypoint:
 
 ```bash
 python3 skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
@@ -63,7 +63,7 @@ The Skill script is responsible for checking:
 
 ## Parser Requirement
 
-Phase-01 requires the HDT3213 `rdb` CLI.
+Phase-01 and Phase-02 require the HDT3213 `rdb` CLI.
 
 The runtime environment must have `rdb` available in PATH before analysis can succeed.
 
@@ -137,7 +137,7 @@ Do not infer or use:
 - Kubernetes paths;
 - container paths unless the user explicitly says the file is already available locally.
 
-Phase-01 only supports analyzing a local file that is directly accessible to the current machine.
+Phase-01 and Phase-02 only support analyzing a local file that is directly accessible to the current machine.
 
 ---
 
@@ -195,7 +195,7 @@ python3 skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
   --user-request "请分析本地 RDB 文件 /data/redis/dump.rdb"
 ```
 
-The LLM should directly call only this Skill script in Phase-01.
+The LLM should directly call only this Skill script in Phase-01 and Phase-02.
 
 The script may internally call reusable tools under:
 
@@ -204,9 +204,9 @@ tools/validation/
 tools/docx_renderer/
 ```
 
-The LLM must not directly call those reusable tools in Phase-01.
+The LLM must not directly call those reusable tools in Phase-01 or Phase-02.
 
-Do not ask the LLM to compute:
+Do not ask the LLM to compute, repair, or infer deterministic totals:
 
 - Redis key totals;
 - type totals;
@@ -262,11 +262,13 @@ If `cat` fails, report the failure and include the output directory.
 
 The `result.json` file must be treated as the source of truth.
 
-It should include at least:
+Phase-02 requires this stable top-level contract:
 
 ```json
 {
+  "schema_version": "phase-02.v1",
   "status": "success | partial | failed",
+  "generated_at": "...",
   "parser_required": true,
   "parser_strategy": "HdtRdbCli",
   "parser_binary": "/path/to/rdb or unavailable",
@@ -302,9 +304,32 @@ It should include at least:
     }
   },
   "uncertainties": [],
-  "errors": []
+  "errors": [],
+  "outputs": {
+    "output_dir": "/tmp/axe_rdb_assistant/<run_id>",
+    "summary_txt": {
+      "path": "/tmp/axe_rdb_assistant/<run_id>/summary.txt",
+      "exists": true
+    },
+    "result_json": {
+      "path": "/tmp/axe_rdb_assistant/<run_id>/result.json",
+      "exists": true
+    },
+    "report_docx": {
+      "path": "/tmp/axe_rdb_assistant/<run_id>/report.docx",
+      "exists": true
+    }
+  }
 }
 ```
+
+Strict status semantics:
+
+| Status | Interpretation |
+|---|---|
+| `success` | HDT parser ran successfully, mechanical/logical validation passed, and available data is sufficient for the request. |
+| `partial` | Some data exists, but coverage or validation is incomplete; label the response as partial. |
+| `failed` | Analysis did not complete; never summarize it as success. |
 
 If `rdb` is missing, expected result state is:
 
@@ -317,6 +342,10 @@ validation.mechanical.status = fail
 validation.logical.status = skipped
 validation.sufficiency.status = insufficient
 ```
+
+If `status` is `failed`, the response must start from the failure state and only mention verified artifacts such as the RDB path, SHA256 if available, errors, validation details, and generated output paths.
+
+If `status` is `partial`, the response must explicitly say the analysis is partial and must not present missing statistics or unsupported conclusions as verified.
 
 ---
 
@@ -359,9 +388,16 @@ summary.txt
 Use these categories:
 
 - Verified fact: directly present in output files.
-- Inference: derived by the LLM from output files and explicitly labeled.
+- Inference: derived by the LLM from output files and explicitly labeled; do not use inferences to replace deterministic totals.
 - Risk: present in `findings` or clearly derived from references.
 - Uncertainty: present in `uncertainties`, `errors`, or validation details.
+
+Respect source traceability:
+
+- `input.source` and `summary.source` identify the source for core facts.
+- Each object in `findings` should carry `source`.
+- Each object in `uncertainties` should carry `source` when applicable.
+- If a conclusion-like statement has no source, label it as an inference or omit it.
 
 Do not fabricate:
 
@@ -395,6 +431,12 @@ If any layer fails or is insufficient, report the status clearly.
 If `rdb` is missing, the analysis is failed, not partial success.
 
 If HDT execution fails, the analysis is failed, and no fallback parser should be used.
+
+When the user asks for a formal report, verify `outputs.report_docx.exists` before saying the report was generated.
+
+When the user asks for TTL analysis, use only `summary.ttl` and validation details. Do not recompute TTL totals in the LLM.
+
+When the user asks for Big Key risk analysis in Phase-02, only report Big Key data if it appears in `result.json`; otherwise label it as deferred or insufficient.
 
 ---
 
@@ -439,7 +481,7 @@ Do not:
 - introduce MCP;
 - introduce sub-agents;
 - patch or wrap axe;
-- call `tools/validation/` or `tools/docx_renderer/` directly from the LLM in Phase-01;
+- call `tools/validation/` or `tools/docx_renderer/` directly from the LLM in Phase-01 or Phase-02;
 - compute Redis statistics inside the LLM;
 - fabricate statistics, keys, risks, parser details, or output files;
 - hide failures or uncertainties;

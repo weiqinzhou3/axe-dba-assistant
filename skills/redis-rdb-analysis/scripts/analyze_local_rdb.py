@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Skill-owned local Redis RDB analysis entrypoint for Phase-01."""
+"""Skill-owned local Redis RDB analysis entrypoint for Phase-01 and Phase-02."""
 
 import argparse
 import hashlib
@@ -202,7 +202,13 @@ def sha256_file(path):
 
 def base_result(rdb_path, sha256_value, status):
     return {
+        "schema_version": "phase-02.v1",
         "status": status,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "parser_required": True,
+        "parser_strategy": "HdtRdbCli",
+        "parser_binary": "unavailable",
+        "parser_warnings": [],
         "input": {
             "rdb_path": str(rdb_path),
             "sha256": sha256_value,
@@ -226,7 +232,7 @@ def base_result(rdb_path, sha256_value, status):
         },
         "uncertainties": [],
         "errors": [],
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "outputs": {},
     }
 
 
@@ -244,19 +250,39 @@ def build_summary_text(result):
             "- SHA256: %s" % (result["input"]["sha256"] or "unavailable"),
             "- Analysis status: %s" % result["status"],
             "",
-            "2. Basic Statistics",
+            "2. Parser Metadata",
+            "- Parser required: %s" % json.dumps(result.get("parser_required", False)),
+            "- Parser strategy: %s" % result.get("parser_strategy", "unavailable"),
+            "- Parser binary: %s" % result.get("parser_binary", "unavailable"),
+            "- Parser warnings: %s"
+            % (
+                json.dumps(result.get("parser_warnings"), ensure_ascii=False)
+                if result.get("parser_warnings")
+                else "none"
+            ),
+            "",
+            "3. Basic Statistics",
             "- DB count: %s" % summary["db_count"],
             "- Total keys: %s" % summary["total_keys"],
             "- Type distribution: %s" % json.dumps(summary["type_distribution"], sort_keys=True),
             "- TTL overview: keys_with_ttl=%s, keys_without_ttl=%s"
             % (summary["ttl"]["keys_with_ttl"], summary["ttl"]["keys_without_ttl"]),
             "",
-            "3. Validation Result",
+            "4. Validation Result",
             "- Mechanical validation: %s" % validation["mechanical"]["status"],
             "- Logical validation: %s" % validation["logical"]["status"],
             "- Sufficiency validation: %s" % validation["sufficiency"]["status"],
             "",
-            "4. Risks and Uncertainties",
+            "5. Generated Outputs",
+            "- Output directory: %s" % result.get("outputs", {}).get("output_dir", "unavailable"),
+            "- summary.txt: %s"
+            % result.get("outputs", {}).get("summary_txt", {}).get("path", "unavailable"),
+            "- result.json: %s"
+            % result.get("outputs", {}).get("result_json", {}).get("path", "unavailable"),
+            "- report.docx: %s"
+            % result.get("outputs", {}).get("report_docx", {}).get("path", "unavailable"),
+            "",
+            "6. Risks and Uncertainties",
             "- Findings: %s" % (json.dumps(findings, ensure_ascii=False) if findings else "none"),
             "- Uncertainties: %s"
             % (json.dumps(uncertainties, ensure_ascii=False) if uncertainties else "none"),
@@ -281,6 +307,20 @@ def build_docx_sections(result):
             ],
         },
         {
+            "heading": "Parser Metadata",
+            "lines": [
+                "Parser required: %s" % json.dumps(result.get("parser_required", False)),
+                "Parser strategy: %s" % result.get("parser_strategy", "unavailable"),
+                "Parser binary: %s" % result.get("parser_binary", "unavailable"),
+                "Parser warnings: %s"
+                % (
+                    json.dumps(result.get("parser_warnings"), ensure_ascii=False)
+                    if result.get("parser_warnings")
+                    else "none"
+                ),
+            ],
+        },
+        {
             "heading": "Basic Statistics",
             "lines": [
                 "DB count: %s" % summary["db_count"],
@@ -299,7 +339,7 @@ def build_docx_sections(result):
             ],
         },
         {
-            "heading": "Risks, Uncertainties, and Phase-01 Limitations",
+            "heading": "Risks, Uncertainties, and Phase-01 / Phase-02 limitations",
             "lines": [
                 "Findings: %s"
                 % (json.dumps(result.get("findings"), ensure_ascii=False) if result.get("findings") else "none"),
@@ -309,31 +349,79 @@ def build_docx_sections(result):
                     if result.get("uncertainties")
                     else "none"
                 ),
-                "Phase-01 limitations: local RDB only; no remote Redis, SSH, MySQL staging, multi-RDB aggregation, or final delivery-grade docx styling.",
+                "Phase-01 / Phase-02 limitations: local RDB only; no remote Redis, SSH, MySQL staging, multi-RDB aggregation, full audit trace, advanced risk knowledge base, or final delivery-grade docx styling.",
             ],
         },
     ]
 
 
-def write_outputs(output_dir, result, user_request):
+def build_outputs_metadata(output_dir):
+    return {
+        "output_dir": str(output_dir),
+        "summary_txt": {
+            "path": str(output_dir / "summary.txt"),
+            "exists": (output_dir / "summary.txt").exists(),
+        },
+        "result_json": {
+            "path": str(output_dir / "result.json"),
+            "exists": (output_dir / "result.json").exists(),
+        },
+        "report_docx": {
+            "path": str(output_dir / "report.docx"),
+            "exists": (output_dir / "report.docx").exists(),
+        },
+    }
+
+
+def apply_validation(result, mechanical_details=None, sufficiency_details=None):
+    validation = validate_result(result)
+    for detail in mechanical_details or []:
+        if detail not in validation["mechanical"]["details"]:
+            validation["mechanical"]["details"].append(detail)
+        validation["mechanical"]["status"] = "fail"
+    for detail in sufficiency_details or []:
+        if detail not in validation["sufficiency"]["details"]:
+            validation["sufficiency"]["details"].append(detail)
+        validation["sufficiency"]["status"] = "insufficient"
+    result["validation"] = validation
+
+
+def write_outputs(output_dir, result, user_request, mechanical_details=None, sufficiency_details=None):
     output_dir.mkdir(parents=True, exist_ok=True)
     input_dir = output_dir / "input"
     input_dir.mkdir(parents=True, exist_ok=True)
+    result["outputs"] = build_outputs_metadata(output_dir)
 
     (input_dir / "user_request.txt").write_text(user_request or "", encoding="utf-8")
     (input_dir / "rdb.fingerprint").write_text(
         result["input"]["sha256"] or "unavailable", encoding="utf-8"
     )
 
-    (output_dir / "result.json").write_text(
-        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
     (output_dir / "summary.txt").write_text(build_summary_text(result), encoding="utf-8")
     render_docx(
         output_dir / "report.docx",
         "Redis RDB Analysis Report",
         build_docx_sections(result),
+    )
+    result["outputs"] = build_outputs_metadata(output_dir)
+    apply_validation(result, mechanical_details, sufficiency_details)
+    (output_dir / "result.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    result["outputs"] = build_outputs_metadata(output_dir)
+    apply_validation(result, mechanical_details, sufficiency_details)
+    (output_dir / "summary.txt").write_text(build_summary_text(result), encoding="utf-8")
+    render_docx(
+        output_dir / "report.docx",
+        "Redis RDB Analysis Report",
+        build_docx_sections(result),
+    )
+    result["outputs"] = build_outputs_metadata(output_dir)
+    apply_validation(result, mechanical_details, sufficiency_details)
+    (output_dir / "result.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
     )
 
 
@@ -362,10 +450,7 @@ def main(argv=None):
     if not rdb_path.exists() or not rdb_path.is_file():
         result = base_result(rdb_path, "", "failed")
         result["errors"].append("RDB file does not exist or is not a file: %s" % rdb_path)
-        result["validation"] = validate_result(result)
-        result["validation"]["mechanical"]["status"] = "fail"
-        result["validation"]["mechanical"]["details"].append("input file is missing")
-        write_outputs(output_dir, result, args.user_request)
+        write_outputs(output_dir, result, args.user_request, mechanical_details=["input file is missing"])
         print(str(output_dir))
         return 1
 
@@ -375,6 +460,9 @@ def main(argv=None):
     try:
         parsed_summary = parse_rdb(rdb_path)
         warnings = parsed_summary.pop("parser_warnings", [])
+        result["parser_strategy"] = parsed_summary.get("parser_strategy", "HdtRdbCli")
+        result["parser_binary"] = parsed_summary.get("parser_binary", "unavailable")
+        result["parser_warnings"] = warnings
         result["summary"] = parsed_summary
         result["uncertainties"].extend(warnings)
     except Exception as exc:
@@ -384,17 +472,16 @@ def main(argv=None):
             "Only file existence and SHA256 fingerprint are verified; HDT parsing did not complete."
         )
 
-    result["validation"] = validate_result(result)
+    mechanical_details = []
+    sufficiency_details = []
     if result["status"] == "failed":
-        result["validation"]["mechanical"]["status"] = "fail"
-        result["validation"]["mechanical"]["details"].append("HDT RDB parser failed")
+        mechanical_details.append("HDT RDB parser failed")
     if result["status"] != "success":
-        result["validation"]["sufficiency"]["status"] = "insufficient"
-        result["validation"]["sufficiency"]["details"].append(
+        sufficiency_details.append(
             "RDB parser did not provide enough data for complete statistics."
         )
 
-    write_outputs(output_dir, result, args.user_request)
+    write_outputs(output_dir, result, args.user_request, mechanical_details, sufficiency_details)
     print(str(output_dir))
     return 0 if result["status"] == "success" else 1
 
