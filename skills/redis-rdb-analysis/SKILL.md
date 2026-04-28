@@ -8,7 +8,7 @@ Use this Skill when the user asks to analyze a local Redis RDB file and produce:
 - a structured JSON result;
 - a minimal docx report.
 
-Phase-01 through Phase-04 support **local Redis RDB file analysis only**.
+Phase-01 through Phase-05 support **local Redis RDB file analysis only**.
 
 The Skill guides the LLM. Deterministic parsing, arithmetic, file checks, SHA256 calculation, HDT availability checks, validation, and output generation must be delegated to the Skill script. `result.json` is the source of truth for every status, statistic, file path, and validation conclusion.
 
@@ -32,7 +32,7 @@ Absolute RDB input paths are allowed and should be passed to the script unchange
 
 ## Core Execution Rule
 
-For Phase-01 through Phase-04, the LLM should directly call only one execution entrypoint:
+For Phase-01 through Phase-05, the LLM should directly call only one execution entrypoint:
 
 ```bash
 python3 skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
@@ -63,7 +63,7 @@ The Skill script is responsible for checking:
 
 ## Parser Requirement
 
-Phase-01 through Phase-04 require the HDT3213 `rdb` CLI.
+Phase-01 through Phase-05 require the HDT3213 `rdb` CLI.
 
 The runtime environment must have `rdb` available in PATH before analysis can succeed.
 
@@ -137,7 +137,7 @@ Do not infer or use:
 - Kubernetes paths;
 - container paths unless the user explicitly says the file is already available locally.
 
-Phase-01 through Phase-04 only support analyzing a local file that is directly accessible to the current machine.
+Phase-01 through Phase-05 only support analyzing a local file that is directly accessible to the current machine.
 
 ---
 
@@ -195,7 +195,7 @@ python3 skills/redis-rdb-analysis/scripts/analyze_local_rdb.py \
   --user-request "请分析本地 RDB 文件 /data/redis/dump.rdb"
 ```
 
-The LLM should directly call only this Skill script in Phase-01 through Phase-04.
+The LLM should directly call only this Skill script in Phase-01 through Phase-05.
 
 The script may internally call reusable tools under:
 
@@ -204,7 +204,7 @@ tools/validation/
 tools/docx_renderer/
 ```
 
-The LLM must not directly call those reusable tools in Phase-01 through Phase-04.
+The LLM must not directly call those reusable tools in Phase-01 through Phase-05.
 
 Do not ask the LLM to compute, repair, or infer deterministic totals:
 
@@ -524,7 +524,7 @@ Do not:
 - introduce MCP;
 - introduce sub-agents;
 - patch or wrap axe;
-- call `tools/validation/` or `tools/docx_renderer/` directly from the LLM in Phase-01 through Phase-04;
+- call `tools/validation/` or `tools/docx_renderer/` directly from the LLM in Phase-01 through Phase-05;
 - compute Redis statistics inside the LLM;
 - fabricate statistics, keys, risks, parser details, or output files;
 - hide failures or uncertainties;

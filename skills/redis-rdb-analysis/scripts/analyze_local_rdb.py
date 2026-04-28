@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Skill-owned local Redis RDB analysis entrypoint for Phase-01 through Phase-04."""
+"""Skill-owned local Redis RDB analysis entrypoint for Phase-01 through Phase-05."""
 
 import argparse
 import hashlib

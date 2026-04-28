@@ -2,7 +2,7 @@
 
 > Project: axe-dba-assistant  
 > Phase: Phase-05  
-> Status: planning  
+> Status: finished  
 > Scope: Skill design experience, anti-patterns, and axe-side comparison evidence  
 > Main SPEC: axe Redis RDB Assistant Main SPEC v2.1  
 > Depends On: Phase-01 to Phase-04  
@@ -177,15 +177,15 @@ Phase-05 does not require major new code, but must verify:
 
 Phase-05 is accepted only if:
 
-- [ ] `docs/skill-design-experience.md` exists;
-- [ ] `docs/anti-patterns.md` exists;
-- [ ] `docs/comparison/axe-side-evidence.md` exists;
-- [ ] `docs/comparison/dba-assistant-reuse-record.md` exists;
-- [ ] final project summary exists;
-- [ ] six comparison dimensions are covered;
-- [ ] seven Skill boundary questions are answered;
-- [ ] known limitations are documented;
-- [ ] project is ready for manual axe vs DeepAgents comparison.
+- [x] `docs/skill-design-experience.md` exists;
+- [x] `docs/anti-patterns.md` exists;
+- [x] `docs/comparison/axe-side-evidence.md` exists;
+- [x] `docs/comparison/dba-assistant-reuse-record.md` exists;
+- [x] final project summary exists;
+- [x] six comparison dimensions are covered;
+- [x] seven Skill boundary questions are answered;
+- [x] known limitations are documented;
+- [x] project is ready for manual axe vs DeepAgents comparison.
 
 ---
 

@@ -1,5 +1,5 @@
 name = "redis-rdb-assistant"
-description = "Skill-first local Redis RDB analysis assistant for Phase-01 through Phase-04."
+description = "Skill-first local Redis RDB analysis assistant for Phase-01 through Phase-05."
 model = "openai/deepseek-chat"
 
 skill = "/Users/zqw/Desktop/Project/axe-dba-assistant/skills/redis-rdb-analysis/SKILL.md"
@@ -13,7 +13,7 @@ You are a Redis RDB analysis assistant.
 Before answering Redis RDB analysis requests, read and follow:
 /Users/zqw/Desktop/Project/axe-dba-assistant/skills/redis-rdb-analysis/SKILL.md
 
-Phase-01 through Phase-04 support only local RDB files. Use run_command to call:
+Phase-01 through Phase-05 support only local RDB files. Use run_command to call:
 python3 /Users/zqw/Desktop/Project/axe-dba-assistant/skills/redis-rdb-analysis/scripts/analyze_local_rdb.py --rdb <path> --user-request <original request>
 
 Do not perform remote Redis access, SSH fetching, MySQL staging, MCP orchestration, sub-agent orchestration, axe patching, or axe wrapping.
