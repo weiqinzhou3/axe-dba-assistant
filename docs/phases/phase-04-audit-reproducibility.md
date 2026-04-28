@@ -2,7 +2,7 @@
 
 > Project: axe-dba-assistant  
 > Phase: Phase-04  
-> Status: planning  
+> Status: finished  
 > Scope: Run archive, audit capture, repeatability evidence  
 > Main SPEC: axe Redis RDB Assistant Main SPEC v2.1  
 > Depends On: Phase-02 and Phase-03  
@@ -205,14 +205,14 @@ Add tests or smoke checks for:
 
 Phase-04 is accepted only if:
 
-- [ ] run archive layout matches the spec;
-- [ ] `audit/meta.json` is generated;
-- [ ] stdout/stderr or equivalent logs are captured;
-- [ ] axe verbose/json traces are captured or limitation is documented;
-- [ ] failed runs are archived;
-- [ ] repeatability check is documented;
-- [ ] no axe patching or wrapping beyond a lightweight wrapper occurs;
-- [ ] no generated archive files are committed to the repository.
+- [x] run archive layout matches the spec;
+- [x] `audit/meta.json` is generated;
+- [x] stdout/stderr or equivalent logs are captured;
+- [x] axe verbose/json traces are captured or limitation is documented;
+- [x] failed runs are archived;
+- [x] repeatability check is documented;
+- [x] no axe patching or wrapping beyond a lightweight wrapper occurs;
+- [x] no generated archive files are committed to the repository.
 
 ---
 

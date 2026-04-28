@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Skill-owned local Redis RDB analysis entrypoint for Phase-01 and Phase-02."""
+"""Skill-owned local Redis RDB analysis entrypoint for Phase-01 through Phase-04."""
 
 import argparse
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -493,6 +495,99 @@ def build_outputs_metadata(output_dir):
     }
 
 
+def build_audit_metadata(
+    output_dir,
+    result,
+    raw_argv,
+    started_at,
+    finished_at,
+    duration_ms,
+    exit_code,
+):
+    return {
+        "run_id": output_dir.name,
+        "started_at": started_at.isoformat(),
+        "finished_at": finished_at.isoformat(),
+        "duration_ms": duration_ms,
+        "command": " ".join(
+            shlex.quote(part)
+            for part in [sys.executable, str(Path(__file__).resolve())] + list(raw_argv)
+        ),
+        "workdir": os.getcwd(),
+        "agent": "redis-rdb-assistant",
+        "skill": "skills/redis-rdb-analysis/SKILL.md",
+        "model": os.getenv("AXE_MODEL", "unavailable"),
+        "provider": os.getenv("AXE_PROVIDER", "unavailable"),
+        "rdb_path": result.get("input", {}).get("rdb_path", ""),
+        "rdb_sha256": result.get("input", {}).get("sha256", ""),
+        "exit_code": exit_code,
+        "status": result.get("status", "failed"),
+        "parser_strategy": result.get("parser_strategy", "unavailable"),
+        "parser_binary": result.get("parser_binary", "unavailable"),
+    }
+
+
+def build_trace_payload(output_dir, result, meta):
+    return {
+        "run_id": output_dir.name,
+        "schema_version": "phase-04.audit.v1",
+        "analysis_status": result.get("status"),
+        "result_json": str(output_dir / "result.json"),
+        "summary_txt": str(output_dir / "summary.txt"),
+        "report_docx": str(output_dir / "report.docx"),
+        "stable_fields": {
+            "input.sha256": result.get("input", {}).get("sha256"),
+            "summary.total_keys": result.get("summary", {}).get("total_keys"),
+            "summary.db_count": result.get("summary", {}).get("db_count"),
+            "summary.type_distribution": result.get("summary", {}).get("type_distribution"),
+            "summary.ttl": result.get("summary", {}).get("ttl"),
+            "parser_strategy": result.get("parser_strategy"),
+        },
+        "axe_trace_capture": {
+            "status": "not_captured_by_direct_script",
+            "reason": "Phase-04 direct Skill script runs outside axe model execution. Use axe native verbose/json options when invoking the agent; this file records the limitation instead of fabricating trace data.",
+        },
+        "meta": meta,
+    }
+
+
+def write_audit_archive(output_dir, result, raw_argv, started_at, started_monotonic, exit_code):
+    audit_dir = output_dir / "audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    finished_at = datetime.now(timezone.utc)
+    duration_ms = max(0, int((time.monotonic() - started_monotonic) * 1000))
+    meta = build_audit_metadata(
+        output_dir,
+        result,
+        raw_argv,
+        started_at,
+        finished_at,
+        duration_ms,
+        exit_code,
+    )
+    (audit_dir / "meta.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    (audit_dir / "stdout.log").write_text(
+        "output_dir=%s\nstatus=%s\n" % (output_dir, result.get("status")),
+        encoding="utf-8",
+    )
+    (audit_dir / "stderr.log").write_text(
+        "\n".join(result.get("errors") or []) + ("\n" if result.get("errors") else ""),
+        encoding="utf-8",
+    )
+    (audit_dir / "axe_verbose.log").write_text(
+        "Axe verbose output is not captured by analyze_local_rdb.py direct execution.\n"
+        "Use axe native verbose/json trace options when invoking the agent; Phase-04 records this limitation.\n",
+        encoding="utf-8",
+    )
+    (audit_dir / "trace.json").write_text(
+        json.dumps(build_trace_payload(output_dir, result, meta), ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
 def apply_validation(result, mechanical_details=None, sufficiency_details=None):
     validation = validate_result(result)
     for detail in mechanical_details or []:
@@ -553,7 +648,7 @@ def write_outputs(
 
 
 def default_output_dir():
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     return Path("/tmp/axe_rdb_assistant") / run_id
 
 
@@ -575,7 +670,10 @@ def parse_args(argv):
 
 
 def main(argv=None):
-    args = parse_args(argv or sys.argv[1:])
+    raw_argv = list(argv) if argv is not None else sys.argv[1:]
+    started_at = datetime.now(timezone.utc)
+    started_monotonic = time.monotonic()
+    args = parse_args(raw_argv)
     rdb_path = Path(args.rdb).expanduser()
     output_dir = Path(args.output_dir).expanduser() if args.output_dir else default_output_dir()
 
@@ -583,6 +681,7 @@ def main(argv=None):
         result = base_result(rdb_path, "", "failed")
         result["errors"].append("RDB file does not exist or is not a file: %s" % rdb_path)
         write_outputs(output_dir, result, args.user_request, mechanical_details=["input file is missing"])
+        write_audit_archive(output_dir, result, raw_argv, started_at, started_monotonic, 1)
         print(str(output_dir))
         return 1
 
@@ -609,6 +708,7 @@ def main(argv=None):
             sufficiency_details=["RDB analysis resources were unavailable."],
             report_outline=report_outline,
         )
+        write_audit_archive(output_dir, result, raw_argv, started_at, started_monotonic, 1)
         print(str(output_dir))
         return 1
 
@@ -636,6 +736,7 @@ def main(argv=None):
             "RDB parser did not provide enough data for complete statistics."
         )
 
+    exit_code = 0 if result["status"] == "success" else 1
     write_outputs(
         output_dir,
         result,
@@ -644,8 +745,9 @@ def main(argv=None):
         sufficiency_details,
         report_outline=report_outline,
     )
+    write_audit_archive(output_dir, result, raw_argv, started_at, started_monotonic, exit_code)
     print(str(output_dir))
-    return 0 if result["status"] == "success" else 1
+    return exit_code
 
 
 if __name__ == "__main__":
